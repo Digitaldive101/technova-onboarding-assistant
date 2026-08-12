@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Environments and secrets
+.venv/
+venv/
+env/
+.env
+
+# Local generated data
+chroma_db/
+*.sqlite3
+
+# Company knowledge-base files may contain confidential policy information
+data/*.pdf
+
+# Company branding asset (keep a local copy at assets/company_logo.png)
+assets/company_logo.png
+assets/header_logo.png
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Editors and operating systems
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
