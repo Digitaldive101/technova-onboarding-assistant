@@ -1,0 +1,11 @@
+[theme]
+base = "light"
+primaryColor = "#0F6BFF"
+backgroundColor = "#F7F9FC"
+secondaryBackgroundColor = "#EEF3F8"
+textColor = "#102A43"
+font = "sans-serif"
+
+[client]
+# Keep the viewer experience light-only and remove the theme selector.
+toolbarMode = "minimal"
