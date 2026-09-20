@@ -33,8 +33,14 @@ class Settings(BaseSettings):
     collection_name: str = "employee_onboarding_documents"
 
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
+    embedding_local_files_only: bool = False
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "llama3.2"
+    llm_provider: str = "openrouter"
+    openrouter_api_key: str | None = None
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
+    openrouter_model: str = "liquid/lfm-2.5-2.6b:free"
+    llm_request_timeout_seconds: int = Field(default=90, ge=10, le=300)
     llm_temperature: float = Field(default=0.0, ge=0.0, le=1.0)
 
     chunk_size: int = Field(default=1000, gt=0)

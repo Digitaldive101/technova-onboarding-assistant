@@ -14,16 +14,11 @@ venv/
 env/
 .env
 
-# Local generated data
-chroma_db/
-*.sqlite3
+# ChromaDB index files are versioned for Streamlit Community Cloud.
+!chroma_db/
+!chroma_db/**
 
-# Company knowledge-base files may contain confidential policy information
-data/*.pdf
-
-# Company branding asset (keep a local copy at assets/company_logo.png)
-assets/company_logo.png
-assets/header_logo.png
+# Deployment assets are intentionally versioned for Streamlit Community Cloud.
 
 # Streamlit
 .streamlit/secrets.toml

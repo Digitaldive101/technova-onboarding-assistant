@@ -7,7 +7,7 @@ import logging
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
-from backend.chat import OllamaUnavailableError
+from backend.chat import LLMUnavailableError
 from backend.rag import ConversationTurn, RAGResponse, answer_question
 from backend.utils import get_knowledge_base_status
 from backend.vector_store import VectorStoreError
@@ -79,7 +79,7 @@ def chat(request: ChatRequest) -> ChatResponse:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     except VectorStoreError as exc:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
-    except OllamaUnavailableError as exc:
+    except LLMUnavailableError as exc:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
     except Exception as exc:
         logger.exception("Unexpected chat-processing failure")

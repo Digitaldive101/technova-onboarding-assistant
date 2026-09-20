@@ -4,17 +4,40 @@ from __future__ import annotations
 
 import os
 import base64
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-import requests
 import streamlit as st
 
 
-API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000").rstrip("/")
-MODEL_NAME = os.getenv("OLLAMA_MODEL", "llama3.2")
 PROJECT_DIR = Path(__file__).resolve().parents[1]
+if str(PROJECT_DIR) not in sys.path:
+    sys.path.insert(0, str(PROJECT_DIR))
+
+
+def _load_cloud_secrets() -> None:
+    """Expose Streamlit Cloud secrets to the shared backend configuration."""
+    try:
+        for name in ("OPENROUTER_API_KEY", "OPENROUTER_MODEL"):
+            value = st.secrets.get(name)
+            if value:
+                os.environ.setdefault(name, str(value))
+    except Exception:
+        # Local development may not have a Streamlit secrets file.
+        pass
+
+
+_load_cloud_secrets()
+
+from backend.chat import LLMUnavailableError
+from backend.rag import ConversationTurn, answer_question
+from backend.utils import get_knowledge_base_status
+from backend.vector_store import VectorStoreError
+
+
+MODEL_NAME = os.getenv("OPENROUTER_MODEL", "liquid/lfm-2.5-2.6b:free")
 LOGO_PATH = PROJECT_DIR / "assets" / "company_logo.png"
 HEADER_LOGO_PATH = PROJECT_DIR / "assets" / "header_logo.png"
 SUGGESTED_QUESTIONS = [
@@ -35,33 +58,39 @@ def initialise_session() -> None:
 
 @st.cache_data(ttl=15, show_spinner=False)
 def get_backend_status() -> dict[str, Any] | None:
-    """Get backend and fixed-index readiness information."""
+    """Get locally bundled knowledge-base readiness information."""
     try:
-        health = requests.get(f"{API_BASE_URL}/", timeout=3)
-        status = requests.get(f"{API_BASE_URL}/knowledge-base/status", timeout=3)
-        if health.ok and health.json().get("status") == "running" and status.ok:
-            return dict(status.json())
-        return None
-    except requests.RequestException:
+        status = get_knowledge_base_status()
+        return {
+            "document_count": status.document_count,
+            "indexed_chunk_count": status.indexed_chunk_count,
+            "is_ready": status.is_ready,
+        }
+    except Exception:
         return None
 
 
 def request_answer(question: str) -> dict[str, Any]:
-    """Request a grounded answer from the backend API."""
+    """Run RAG locally in Streamlit and send only context to OpenRouter."""
     try:
-        response = requests.post(
-            f"{API_BASE_URL}/chat",
-            json={"question": question, "history": st.session_state.messages[-6:]},
-            timeout=120,
-        )
-        if response.ok:
-            return response.json()
-        detail = response.json().get("detail", "The assistant could not answer right now.")
-        raise RuntimeError(detail)
-    except requests.Timeout as exc:
-        raise RuntimeError("The assistant took too long to respond. Please try again.") from exc
-    except requests.RequestException as exc:
-        raise RuntimeError("Cannot connect to the assistant backend. Is FastAPI running?") from exc
+        history = [
+            ConversationTurn(role=item["role"], content=item["content"])
+            for item in st.session_state.messages[-6:]
+        ]
+        response = answer_question(question, history)
+        return {
+            "answer": response.answer,
+            "sources": [
+                {"document": source.document, "page": source.page}
+                for source in response.sources
+            ],
+        }
+    except ValueError as exc:
+        raise RuntimeError(str(exc)) from exc
+    except (VectorStoreError, LLMUnavailableError) as exc:
+        raise RuntimeError(str(exc)) from exc
+    except Exception as exc:
+        raise RuntimeError("The assistant could not process the question.") from exc
 
 
 def add_message(role: str, content: str, sources: list[dict[str, Any]] | None = None) -> None:

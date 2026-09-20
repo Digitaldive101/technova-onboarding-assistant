@@ -1,6 +1,6 @@
 # AI Employee Onboarding Assistant
 
-A local, privacy-conscious Retrieval-Augmented Generation (RAG) application that helps employees find answers in approved company policy documents. It uses FastAPI, Streamlit, LangChain, ChromaDB, sentence-transformer embeddings, and a local Ollama model.
+A cloud-deployable Retrieval-Augmented Generation (RAG) application that helps employees find answers in approved company policy documents. It uses Streamlit, LangChain, ChromaDB, sentence-transformer embeddings, and OpenRouter's hosted LLM API.
 
 The assistant is intentionally **not** a generic PDF chatbot: the knowledge base is fixed and managed only by the backend. Employees cannot upload documents.
 
@@ -8,12 +8,12 @@ The assistant is intentionally **not** a generic PDF chatbot: the knowledge base
 
 - Grounded answers from company PDFs only
 - Exact fallback when retrieved documents do not contain the answer
-- Local Ollama inference with `qwen3.6` at temperature `0`
+- OpenRouter inference with `liquid/lfm-2.5-2.6b:free` at temperature `0`
 - Persistent ChromaDB vector database with `all-MiniLM-L6-v2` embeddings
 - Source citations showing document name and page number
 - FastAPI API with typed request and response models
 - Modern Streamlit chat dashboard with suggested questions, timestamps, history, and clear chat
-- Error handling and logging for missing PDFs, corrupt files, missing indexes, unavailable ChromaDB, and offline Ollama
+- Error handling and logging for missing PDFs, corrupt files, missing indexes, unavailable ChromaDB, and unavailable hosted LLMs
 
 ## Architecture
 
@@ -32,7 +32,7 @@ The assistant is intentionally **not** a generic PDF chatbot: the knowledge base
 Employee -> Streamlit UI -> FastAPI POST /chat -> Top 5 relevant chunks
                                                     |
                                                     v
-                                  Strict RAG prompt -> Ollama qwen3.6
+                                  Strict RAG prompt -> OpenRouter hosted model
                                                     |
                                                     v
                               Answer + document/page citations -> Streamlit
@@ -44,7 +44,7 @@ Employee -> Streamlit UI -> FastAPI POST /chat -> Top 5 relevant chunks
 employee_onboarding_ai/
 ├── backend/
 │   ├── app.py                 # FastAPI app and health endpoint
-│   ├── chat.py                # Local Ollama client
+│   ├── chat.py                # OpenRouter LLM client
 │   ├── config.py              # Typed environment settings
 │   ├── embeddings.py          # Sentence-transformer factory
 │   ├── ingest.py              # Fixed-PDF ingestion command
@@ -57,7 +57,7 @@ employee_onboarding_ai/
 ├── frontend/
 │   └── streamlit_app.py       # Employee-facing dashboard
 ├── data/                      # Backend-managed policy PDFs (not committed)
-├── chroma_db/                 # Generated local vector index (not committed)
+├── chroma_db/                 # Pre-built vector index deployed with the app
 ├── .env.example
 ├── .gitignore
 ├── requirements.txt
@@ -67,8 +67,7 @@ employee_onboarding_ai/
 ## Requirements
 
 - Python 3.12
-- [Ollama](https://ollama.com/)
-- The local `qwen3.6` Ollama model
+- An [OpenRouter](https://openrouter.ai/) API key
 - Company policy PDFs placed by an administrator in `data/`
 
 ## Installation
@@ -98,23 +97,11 @@ employee_onboarding_ai/
    Copy-Item .env.example .env
    ```
 
-## Install and prepare Ollama
+## Configure OpenRouter
 
-1. Install Ollama from [ollama.com/download](https://ollama.com/download).
-2. Start the Ollama service if it is not already running.
-3. Pull the required model.
-
-   ```powershell
-   ollama pull qwen3.6
-   ```
-
-4. Optionally verify it.
-
-   ```powershell
-   ollama list
-   ```
-
-> If your local Ollama registry uses a different available Qwen tag, update `OLLAMA_MODEL` in `.env` to that tag before starting the application.
+1. Create an API key at [OpenRouter](https://openrouter.ai/keys).
+2. For local development, add it to `.env` as `OPENROUTER_API_KEY`.
+3. For Streamlit Community Cloud, add it in **Manage app → Settings → Secrets** instead of committing it to Git.
 
 ## Add fixed company documents
 
@@ -190,6 +177,30 @@ $env:API_BASE_URL = "http://your-host:8000"
 streamlit run frontend/streamlit_app.py
 ```
 
+## Deploy on Streamlit Community Cloud
+
+The deployed Streamlit application runs the RAG pipeline directly; it does not
+need a separately deployed FastAPI or Ollama service. It retrieves from the
+pre-built `chroma_db/` index, then sends only the retrieved text context and
+question to OpenRouter.
+
+1. Commit `frontend/`, `backend/`, `assets/`, `data/`, `chroma_db/`, and
+   `requirements.txt` to the repository used by Streamlit Cloud.
+2. In Streamlit Cloud, deploy `frontend/streamlit_app.py` as the entrypoint.
+3. Open **Manage app → Settings → Secrets** and add:
+
+   ```toml
+   OPENROUTER_API_KEY = "your-secret-key"
+   OPENROUTER_MODEL = "liquid/lfm-2.5-2.6b:free"
+   ```
+
+4. Reboot the application after saving the secrets.
+
+> Company documents and the vector index will be available to everyone who can
+> access the repository. Use a private repository and grant Streamlit access to
+> it when the documents are confidential. Do not commit API keys or
+> `.streamlit/secrets.toml`.
+
 ## API
 
 ### `POST /chat`
@@ -238,8 +249,8 @@ Copy `.env.example` to `.env` and adjust values as needed. Important settings in
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `OLLAMA_MODEL` | `qwen3.6` | Local Ollama model tag |
-| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama server URL |
+| `OPENROUTER_MODEL` | `liquid/lfm-2.5-2.6b:free` | Hosted LLM model ID |
+| `OPENROUTER_API_KEY` | — | Secret OpenRouter API key |
 | `EMBEDDING_MODEL` | `sentence-transformers/all-MiniLM-L6-v2` | Local embedding model |
 | `RETRIEVAL_K` | `5` | Maximum retrieved chunks |
 | `SIMILARITY_SCORE_THRESHOLD` | `0.10` | Minimum relevance score |
