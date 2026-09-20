@@ -18,6 +18,24 @@ class LLMUnavailableError(RuntimeError):
     """Raised when the configured hosted language model cannot respond."""
 
 
+def _openrouter_error_message(response: requests.Response) -> str:
+    """Return a safe, user-actionable description of an API failure."""
+    status = response.status_code
+    if status in {401, 403}:
+        return "OpenRouter rejected the API key. Check Streamlit Cloud Secrets and reboot the app."
+    if status == 429:
+        return "OpenRouter's free-tier request limit was reached. Please try again later."
+    if status == 404:
+        return "The configured OpenRouter model is unavailable. Choose another free model in Streamlit Secrets."
+
+    try:
+        detail = response.json().get("error", {}).get("message", "")
+    except ValueError:
+        detail = ""
+    logger.warning("OpenRouter returned HTTP %s: %s", status, detail or response.text[:300])
+    return f"OpenRouter could not complete the request (HTTP {status}). Please try again later."
+
+
 def _message_payload(message: BaseMessage) -> dict[str, str]:
     """Convert a LangChain message to OpenRouter's chat-completions format."""
     role_map = {"human": "user", "ai": "assistant", "system": "system"}
@@ -55,9 +73,12 @@ def generate_answer(messages: list[BaseMessage]) -> str:
             },
             timeout=settings.llm_request_timeout_seconds,
         )
-        response.raise_for_status()
+        if not response.ok:
+            raise LLMUnavailableError(_openrouter_error_message(response))
         payload: dict[str, Any] = response.json()
         answer = str(payload["choices"][0]["message"]["content"]).strip()
+    except LLMUnavailableError:
+        raise
     except (requests.RequestException, KeyError, IndexError, TypeError, ValueError) as exc:
         logger.exception("OpenRouter request failed")
         raise LLMUnavailableError("The hosted language model is unavailable. Please try again.") from exc
