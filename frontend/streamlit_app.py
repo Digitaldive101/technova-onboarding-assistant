@@ -8,8 +8,12 @@ import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import streamlit as st
+
+
+IST = ZoneInfo("Asia/Kolkata")
 
 
 PROJECT_DIR = Path(__file__).resolve().parents[1]
@@ -93,6 +97,11 @@ def request_answer(question: str) -> dict[str, Any]:
         raise RuntimeError("The assistant could not process the question.") from exc
 
 
+def current_ist_time() -> str:
+    """Return the current chat timestamp in India Standard Time."""
+    return datetime.now(IST).strftime("%I:%M %p")
+
+
 def add_message(role: str, content: str, sources: list[dict[str, Any]] | None = None) -> None:
     """Store one rendered message and its timestamp in the active session."""
     st.session_state.messages.append(
@@ -100,7 +109,7 @@ def add_message(role: str, content: str, sources: list[dict[str, Any]] | None = 
             "role": role,
             "content": content,
             "sources": sources or [],
-            "timestamp": datetime.now().strftime("%I:%M %p"),
+            "timestamp": current_ist_time(),
         }
     )
 
@@ -140,7 +149,7 @@ def submit_question(question: str) -> None:
                 sources = list(response.get("sources", []))
         st.markdown(answer)
         render_sources(sources)
-        st.caption(datetime.now().strftime("%I:%M %p"))
+        st.caption(current_ist_time())
     add_message("assistant", answer, sources)
 
 
