@@ -36,6 +36,7 @@ def _load_cloud_secrets() -> None:
 _load_cloud_secrets()
 
 from backend.chat import LLMUnavailableError
+from backend.ingest import ingest_documents
 from backend.rag import ConversationTurn, answer_question
 from backend.utils import get_knowledge_base_status
 from backend.vector_store import VectorStoreError
@@ -65,6 +66,9 @@ def get_backend_status() -> dict[str, Any] | None:
     """Get locally bundled knowledge-base readiness information."""
     try:
         status = get_knowledge_base_status()
+        if status.indexed_chunk_count == 0:
+            ingest_documents()
+            status = get_knowledge_base_status()
         return {
             "document_count": status.document_count,
             "indexed_chunk_count": status.indexed_chunk_count,
