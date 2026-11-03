@@ -28,3 +28,9 @@ env/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Local databases (do not commit)
+chroma_db/
+*.sqlite
+*.sqlite3
+*.db
